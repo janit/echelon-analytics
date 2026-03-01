@@ -1,4 +1,4 @@
-# ea.js — Echelon Analytics
+# ea.js — Echelon Analytics 🩺
 
 Privacy-first, self-hosted web analytics. Drop in a single script tag — no cookie banners needed.
 
