@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ea.js — Echelon Analytics</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #33ff33;
+  font-family: "Courier New", Courier, monospace;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+main {
+  padding: 2rem;
+}
+h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+h1 span { color: #1a9a1a; }
+p {
+  color: #1a9a1a;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+a { color: #33ff33; }
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  background: #33ff33;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>&gt; ea.js <span>— Echelon Analytics</span></h1>
+<p>Privacy-first, self-hosted web analytics.</p>
+<p>Google Analytics sucks now so I rolled my own.<span class="cursor"></span></p>
+<br>
+<p><a href="https://github.com/janit/ea">github.com/janit/ea</a></p>
+</main>
+</body>
+</html>
