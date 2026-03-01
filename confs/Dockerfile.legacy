@@ -1,0 +1,14 @@
+FROM denoland/deno:2.7.1
+
+WORKDIR /app
+
+# Copy source files
+COPY . .
+
+# Install dependencies and build
+RUN deno install
+RUN deno task build
+
+EXPOSE 4100
+
+CMD ["deno", "task", "start"]

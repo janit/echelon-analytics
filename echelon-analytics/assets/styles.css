@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background: #0a0a0a;
+    color: #1a9a1a;
+    font-family: "Courier New", Courier, monospace;
+  }
+  a {
+    color: #33ff33;
+    text-decoration: none;
+  }
+  a:hover {
+    color: #66ff66;
+  }
+}
+
+/* KPI card styles */
+.kpi-card {
+  background: #111;
+  border: 1px solid #1a3a1a;
+  padding: 1rem;
+  text-align: center;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #33ff33;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-label {
+  font-size: 0.75rem;
+  color: #1a5a1a;
+  margin-top: 0.25rem;
+}
+
+/* Bot score badges */
+.bot-score-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid;
+}
+.bot-score-high {
+  color: #ff3333;
+  border-color: #661111;
+  background: #1a0a0a;
+}
+.bot-score-med {
+  color: #ffaa00;
+  border-color: #664400;
+  background: #1a1400;
+}
+.bot-score-low {
+  color: #33ff33;
+  border-color: #1a3a1a;
+  background: #0d1a0d;
+}
+
+/* Excluded row */
+.excluded-row {
+  opacity: 0.4;
+}
+
+/* Visitor ID monospace */
+.visitor-id {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.875rem;
+}
+
+/* Experiment status */
+.status-draft {
+  color: #1a5a1a;
+}
+.status-active {
+  color: #33ff33;
+  font-weight: 500;
+}
+.status-paused {
+  color: #ffaa00;
+}
+.status-completed {
+  color: #00ccff;
+}
+.status-archived {
+  color: #1a3a1a;
+}
+
+/* Blinking cursor */
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  background: #33ff33;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a3a1a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1a5a1a;
+}

@@ -1,0 +1,17 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+.claude/
+data/
+legacy/
+docs/
+scripts/
+confs/
+app/
+*.db
+*.db-wal
+*.db-shm
+README.md
+LICENSE

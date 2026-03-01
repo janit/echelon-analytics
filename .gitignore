@@ -1,0 +1,9 @@
+legacy
+data/*
+!data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+.env
+.claude/
+node_modules/

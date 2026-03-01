@@ -1,0 +1,23 @@
+ea.islets.app {
+	reverse_proxy 127.0.0.1:1947
+
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+
+	# Limit request body size on tracking endpoints
+	@tracking {
+		path /b.gif /e /api/ingest
+	}
+	request_body @tracking {
+		max_size 64KB
+	}
+}
