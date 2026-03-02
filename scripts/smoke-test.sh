@@ -520,6 +520,17 @@ section "API Auth Enforcement"
 http_check "GET /api/health no-auth returns 200" 200 \
   "$BASE_URL/api/health"
 
+# Detect PUBLIC_MODE — in public mode, /api/stats/vitals returns 403 {"error":"redacted"}
+# without auth, whereas in normal auth mode it returns 401.
+PUBLIC_MODE_DETECTED=false
+_PM_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+  --max-time 10 "$BASE_URL/api/stats/vitals" 2>/dev/null) || _PM_STATUS="000"
+_PM_BODY=$(curl -s --max-time 10 "$BASE_URL/api/stats/vitals" 2>/dev/null) || _PM_BODY=""
+if [[ "$_PM_STATUS" == "403" ]] && echo "$_PM_BODY" | grep -q '"redacted"'; then
+  PUBLIC_MODE_DETECTED=true
+  info "PUBLIC_MODE detected — adjusting auth expectations"
+fi
+
 # All other /api/* endpoints must reject requests without auth
 # We test with no auth header. If SECRET is empty the app runs in open mode and
 # these will pass — that is a known deployment risk, not a test failure.
@@ -538,7 +549,24 @@ do
   STATUS_NO_AUTH=$(curl -s -o /dev/null -w '%{http_code}' \
     --max-time 10 "$BASE_URL${ENDPOINT}" 2>/dev/null) || STATUS_NO_AUTH="000"
 
-  if [[ -n "$SECRET" ]]; then
+  if [[ "$PUBLIC_MODE_DETECTED" == true ]]; then
+    # PUBLIC_MODE: GET requests bypass auth; /api/stats/vitals returns 403 (redacted)
+    if [[ "$ENDPOINT" == "/api/stats/vitals" ]]; then
+      if [[ "$STATUS_NO_AUTH" == "403" ]]; then
+        pass "GET ${ENDPOINT} PUBLIC_MODE returns 403 (redacted)"
+      else
+        fail "GET ${ENDPOINT} PUBLIC_MODE — expected 403, got $STATUS_NO_AUTH"
+      fi
+    else
+      if [[ "$STATUS_NO_AUTH" -ge 200 ]] && [[ "$STATUS_NO_AUTH" -lt 300 ]]; then
+        pass "GET ${ENDPOINT} PUBLIC_MODE returns $STATUS_NO_AUTH (read-only access)"
+      elif [[ "$STATUS_NO_AUTH" -ge 500 ]]; then
+        fail "GET ${ENDPOINT} PUBLIC_MODE returned 5xx ($STATUS_NO_AUTH)"
+      else
+        pass "GET ${ENDPOINT} PUBLIC_MODE returns $STATUS_NO_AUTH"
+      fi
+    fi
+  elif [[ -n "$SECRET" ]]; then
     # Auth is configured — unauthenticated request must get 401
     if [[ "$STATUS_NO_AUTH" == "401" ]]; then
       pass "GET ${ENDPOINT} no-auth returns 401"
@@ -556,7 +584,7 @@ do
 done
 
 # Wrong Bearer token must return 401 when SECRET is set
-if [[ -n "$SECRET" ]]; then
+if [[ -n "$SECRET" ]] && [[ "$PUBLIC_MODE_DETECTED" != true ]]; then
   STATUS_WRONG=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
     -H "Authorization: Bearer wrong-token-xxxxxxxx" \
     "$BASE_URL/api/stats/summary" 2>/dev/null) || STATUS_WRONG="000"
@@ -565,21 +593,32 @@ if [[ -n "$SECRET" ]]; then
   else
     fail "GET /api/stats/summary wrong token returned $STATUS_WRONG (expected 401)"
   fi
+elif [[ "$PUBLIC_MODE_DETECTED" == true ]]; then
+  info "Skipping wrong-token test (PUBLIC_MODE bypasses token auth for GET)"
 fi
 
 # ── 9. Authenticated API endpoints — structural checks ───────────────────────
 
 section "API Endpoints — Authenticated Structural Checks"
 
-if [[ ${#AUTH_HEADER[@]} -gt 0 ]] || [[ -z "$SECRET" ]]; then
+if [[ ${#AUTH_HEADER[@]} -gt 0 ]] || [[ -z "$SECRET" ]] || [[ "$PUBLIC_MODE_DETECTED" == true ]]; then
   # /api/stats/summary — must return JSON with buffers and last_24h keys
   http_check "GET /api/stats/summary returns 200" 200 \
     "${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"}" \
     "$BASE_URL/api/stats/summary"
-  if echo "$HTTP_BODY" | grep -q '"buffers"'; then
-    pass "/api/stats/summary response contains buffers"
+  if [[ "$PUBLIC_MODE_DETECTED" == true ]]; then
+    # PUBLIC_MODE redacts the buffers key — verify it's absent
+    if echo "$HTTP_BODY" | grep -q '"buffers"'; then
+      fail "/api/stats/summary PUBLIC_MODE should redact buffers but found it"
+    else
+      pass "/api/stats/summary PUBLIC_MODE correctly redacts buffers"
+    fi
   else
-    fail "/api/stats/summary response missing buffers key"
+    if echo "$HTTP_BODY" | grep -q '"buffers"'; then
+      pass "/api/stats/summary response contains buffers"
+    else
+      fail "/api/stats/summary response missing buffers key"
+    fi
   fi
 
   # /api/stats/overview — missing site_id must return 400
@@ -637,10 +676,16 @@ if [[ ${#AUTH_HEADER[@]} -gt 0 ]] || [[ -z "$SECRET" ]]; then
     "${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"}" \
     "$BASE_URL/api/stats/experiments"
 
-  # /api/stats/vitals
-  http_check "GET /api/stats/vitals returns 200" 200 \
-    "${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"}" \
-    "$BASE_URL/api/stats/vitals"
+  # /api/stats/vitals — returns 403 in PUBLIC_MODE (redacted)
+  if [[ "$PUBLIC_MODE_DETECTED" == true ]]; then
+    http_check "GET /api/stats/vitals PUBLIC_MODE returns 403" 403 \
+      "${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"}" \
+      "$BASE_URL/api/stats/vitals"
+  else
+    http_check "GET /api/stats/vitals returns 200" 200 \
+      "${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"}" \
+      "$BASE_URL/api/stats/vitals"
+  fi
 
   # /api/perf
   http_check "GET /api/perf returns 200 JSON array" 200 \
