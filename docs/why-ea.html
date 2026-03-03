@@ -24,17 +24,35 @@
   <div class="site-header-inner">
     <a href="/" class="logo">Echelon <span>🩺</span></a>
     <button class="nav-toggle" aria-label="Menu" onclick="this.closest('.site-header').classList.toggle('nav-open')">🍔</button>
-    <a href="installation.html">Installation</a>
-    <a href="features.html">Features</a>
-    <a href="api.html">API</a>
-    <a href="bot-defense.html">Bot Defense</a>
-    <a href="configuration.html">Config</a>
-    <a href="architecture.html">Architecture</a>
-    <a href="portable-data.html">Portable Data</a>
-    <a href="mcp.html">MCP</a>
-    <a href="telemetry.html">Telemetry</a>
-    <a href="why-ea.html">Why ea.js?</a>
-    <a href="https://ea.islets.app/admin?site_id=ea">Try it</a>
+    <div class="nav-links">
+      <a href="why-ea.html">Why ea.js?</a>
+      <div class="nav-group">
+        <a href="data-ownership.html" class="nav-group-label">Data Ownership &amp; Open Access <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="data-ownership.html">Data Ownership &amp; Open Access</a>
+          <a href="portable-data.html">Portable Data</a>
+          <a href="api.html">API</a>
+          <a href="mcp.html">MCP</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="features.html" class="nav-group-label">Features <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="features.html">Features</a>
+          <a href="bot-defense.html">Bot Defense</a>
+          <a href="architecture.html">Architecture</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="installation.html" class="nav-group-label">Installation <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="installation.html">Installation</a>
+          <a href="configuration.html">Configuration</a>
+        </div>
+      </div>
+      <a href="telemetry.html">Telemetry</a>
+    </div>
+    <a href="https://ea.islets.app/admin?site_id=ea" class="nav-cta" target="_blank" rel="noopener">Live demo &rarr;</a>
   </div>
 </header>
 
@@ -108,6 +126,7 @@
   <a href="bot-defense.html">Bot Defense</a>
   <a href="configuration.html">Configuration</a>
   <a href="architecture.html">Architecture</a>
+  <a href="data-ownership.html">Data Ownership &amp; Open Access</a>
   <a href="portable-data.html">Portable Data</a>
   <a href="mcp.html">MCP Server</a>
   <a href="telemetry.html">Telemetry</a>

@@ -32,8 +32,6 @@ load_deploy_vars() {
   local envfile="$1"
   [[ -f "$envfile" ]] || return 0
   local val
-  val=$(grep -E '^CPU_CORES=' "$envfile" | cut -d= -f2 | tr -d '[:space:]' || true)
-  [[ -n "$val" ]] && CPU_CORES="$val"
   val=$(grep -E '^BIND_ADDRESS=' "$envfile" | cut -d= -f2 | tr -d '[:space:]' || true)
   [[ -n "$val" ]] && BIND_ADDRESS="$val"
   val=$(grep -E '^ALLOWED_IPS=' "$envfile" | cut -d= -f2 | tr -d '[:space:]' || true)
@@ -50,7 +48,6 @@ VERSION=""
 DEPLOY_LATEST=false
 REDEPLOY=false
 SEAL_OF_APPROVAL=false
-CPU_CORES=1
 NETWORK=""
 INSTANCE_NAME=""
 
@@ -66,7 +63,6 @@ show_help() {
   echo "  --name NAME             Instance name for multi-instance deploys"
   echo "  --deploy-latest         Deploy the most recent git tag"
   echo "  --seal-of-approval      Deploy current branch/HEAD without a tag (quick testing)"
-  echo "  --cpucores N            Limit container to N CPU cores (default from .env or 1)"
   echo "  --redeploy              Fast-track redeploy of an existing image (skip build + smoke)"
   echo "  --network NAME          Join Docker network (for Postgres connectivity)"
   echo "  --help                  Show this help message"
@@ -78,7 +74,6 @@ show_help() {
   echo "Examples:"
   echo "  $0 v26-03-01                     Deploy specific tag"
   echo "  $0 --deploy-latest               Deploy latest tag"
-  echo "  $0 --deploy-latest --cpucores 2  Latest tag, 2 cores"
   echo "  $0 --seal-of-approval            Deploy current branch as-is"
   echo "  $0 --name trippi --seal-of-approval  Named instance deploy"
   exit 0
@@ -90,7 +85,6 @@ while [[ $# -gt 0 ]]; do
     --deploy-latest) DEPLOY_LATEST=true; shift ;;
     --seal-of-approval) SEAL_OF_APPROVAL=true; shift ;;
     --redeploy) REDEPLOY=true; shift ;;
-    --cpucores) CPU_CORES="$2"; shift 2 ;;
     --network) NETWORK="$2"; shift 2 ;;
     --name) INSTANCE_NAME="$2"; shift 2 ;;
     *) VERSION="$1"; shift ;;
@@ -155,10 +149,6 @@ else
   load_deploy_vars ".env"
 fi
 
-if ! [[ "$CPU_CORES" =~ ^[0-9]+$ ]] || [[ "$CPU_CORES" -lt 1 ]]; then
-  die "--cpucores must be a positive integer"
-fi
-
 # Enforce main-only deploys (unless --seal-of-approval)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "$SEAL_OF_APPROVAL" == "true" ]]; then
@@ -191,7 +181,7 @@ else
       printf "  %-16s %s\n" "$tag" "$msg"
     done
     echo ""
-    echo "Usage: $0 <tag> [--deploy-latest] [--redeploy] [--cpucores N]"
+    echo "Usage: $0 <tag> [--deploy-latest] [--redeploy]"
     exit 0
   fi
 
@@ -257,7 +247,7 @@ fi
 
 # ── Smoke test ───────────────────────────────────────────────────────────────
 
-CONTAINER="${CONTAINER_PREFIX}-${GIT_TAG}_cpu-${CPU_CORES}"
+CONTAINER="${CONTAINER_PREFIX}-${GIT_TAG}"
 
 # Ensure data directory exists and is writable by the container user (UID 1001)
 mkdir -p "$DATA_DIR"
@@ -274,7 +264,6 @@ else
     -p "127.0.0.1:0:$PORT" \
     -v "$(pwd)/${DATA_DIR}:/app/data" \
     --add-host=host.docker.internal:host-gateway \
-    --cpuset-cpus="0-$((CPU_CORES - 1))" \
     "${NETWORK_ARGS[@]+"${NETWORK_ARGS[@]}"}" \
     "${ENV_ARGS[@]+"${ENV_ARGS[@]}"}" \
     "$IMAGE:$GIT_TAG" >/dev/null
@@ -378,7 +367,6 @@ docker run -d \
   -v "$(pwd)/${DATA_DIR}:/app/data" \
   -e "VERSION=$VERSION" \
   --add-host=host.docker.internal:host-gateway \
-  --cpuset-cpus="0-$((CPU_CORES - 1))" \
   "${NETWORK_ARGS[@]+"${NETWORK_ARGS[@]}"}" \
   "${ENV_ARGS[@]+"${ENV_ARGS[@]}"}" \
   --restart unless-stopped \
@@ -444,6 +432,5 @@ green "Deployment complete in ${ELAPSED}s"
 echo "  Image:     $IMAGE:$GIT_TAG"
 echo "  Container: $CONTAINER"
 echo "  Port:      ${BIND_ADDRESS}:${PORT}"
-echo "  CPU cores: $CPU_CORES"
 echo "  Data dir:  $DATA_DIR"
 [[ -n "$INSTANCE_NAME" ]] && echo "  Instance:  $INSTANCE_NAME"

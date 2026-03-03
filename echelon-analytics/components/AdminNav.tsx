@@ -47,7 +47,7 @@ const NAV_CSS = `
 #an .nav-toggle-label{display:none}
 #an .nav-inner{display:flex;align-items:center;gap:1rem;flex-wrap:nowrap;min-height:3rem}
 #an .nav-menu{display:flex;align-items:center;gap:.75rem;flex:1}
-#an .nav-links{display:flex;gap:.75rem;white-space:nowrap;font-size:.875rem}
+#an .nav-links{display:flex;flex:1;justify-content:center;gap:.75rem;white-space:nowrap;font-size:.875rem}
 #an .nav-links a{color:var(--ea-nav-muted);text-decoration:none;padding:0}
 #an .nav-links a:hover{color:var(--ea-nav-text)}
 #an .desk-bots{display:block}

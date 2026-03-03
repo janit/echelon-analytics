@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Ownership &amp; Open Access — Echelon Analytics</title>
+<meta name="description" content="Own your first-party analytics data with open access to everything. No vendor lock-in, no sampling, no API quotas. Single SQLite file, open schema, full API, MCP server. AGPL-3.0.">
+<link rel="canonical" href="https://ea.js.org/data-ownership.html">
+<link rel="icon" href="favicon.ico">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Echelon Analytics">
+<meta property="og:title" content="Data Ownership &amp; Open Access — Echelon Analytics">
+<meta property="og:description" content="Own your first-party analytics data. No vendor lock-in, no sampling, no API quotas. Single SQLite file, self-hosted, open schema, full API access.">
+<meta property="og:url" content="https://ea.js.org/data-ownership.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Data Ownership &amp; Open Access — Echelon Analytics">
+<meta name="twitter:description" content="Own your first-party analytics data. No vendor lock-in, no sampling, no API quotas. Single SQLite file, self-hosted, open schema, full API access.">
+<link rel="stylesheet" href="css/style.css">
+<script async src="https://ea.islets.app/ea.js" data-site="echelon-analytics" data-cookie></script>
+</head>
+<body>
+
+<header class="site-header" style="visibility:hidden">
+  <div class="site-header-inner">
+    <a href="/" class="logo">Echelon <span>🩺</span></a>
+    <button class="nav-toggle" aria-label="Menu" onclick="this.closest('.site-header').classList.toggle('nav-open')">🍔</button>
+    <div class="nav-links">
+      <a href="why-ea.html">Why ea.js?</a>
+      <div class="nav-group">
+        <a href="data-ownership.html" class="nav-group-label">Data Ownership &amp; Open Access <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="data-ownership.html">Data Ownership &amp; Open Access</a>
+          <a href="portable-data.html">Portable Data</a>
+          <a href="api.html">API</a>
+          <a href="mcp.html">MCP</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="features.html" class="nav-group-label">Features <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="features.html">Features</a>
+          <a href="bot-defense.html">Bot Defense</a>
+          <a href="architecture.html">Architecture</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="installation.html" class="nav-group-label">Installation <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="installation.html">Installation</a>
+          <a href="configuration.html">Configuration</a>
+        </div>
+      </div>
+      <a href="telemetry.html">Telemetry</a>
+    </div>
+    <a href="https://ea.islets.app/admin?site_id=ea" class="nav-cta" target="_blank" rel="noopener">Live demo &rarr;</a>
+  </div>
+</header>
+
+<nav><a href="/">Echelon 🩺</a> <span class="sep">/</span> Data Ownership &amp; Open Access</nav>
+<main>
+<h1>Data Ownership &amp; Open Access</h1>
+<p class="tagline">Your analytics data belongs to you — first-party, portable, openly accessible, no strings attached.</p>
+
+<hr>
+
+<h2>What First-Party Analytics Data Means</h2>
+<p>First-party analytics data is data collected directly by you, on your infrastructure, from your visitors. No third-party scripts phone home to someone else's servers. No data leaves your control. The raw pageviews, events, and metrics live on <strong>your machine</strong> in a format you can read, query, and move at will.</p>
+<p>With Echelon, "first-party" isn't a marketing label — it's the architecture. The tracker script is served from your domain, data is written to your SQLite database, and nothing is ever sent to Echelon's servers (because there are no Echelon servers to send it to).</p>
+
+<h2>Benefits of Owning Your Data</h2>
+
+<div class="features">
+  <div class="feature">
+    <h3>No Vendor Lock-In</h3>
+    <p>Your data isn't trapped behind a vendor's API or proprietary export format. It's a SQLite file. Copy it, query it, migrate it — no permission needed.</p>
+  </div>
+  <div class="feature">
+    <h3>No Sampling</h3>
+    <p>Every pageview is recorded. No statistical sampling, no data limits, no "upgrade to see full data" prompts. What your visitors do is what you see.</p>
+  </div>
+  <div class="feature">
+    <h3>No API Quotas</h3>
+    <p>Query your data as often as you want. No rate limits, no monthly API call caps, no tiered access. It's your database — use it however you need.</p>
+  </div>
+  <div class="feature">
+    <h3>Full Data Access</h3>
+    <p>Run arbitrary SQL against the raw data. Build custom reports, feed data into other tools, join with your own tables. Nothing is hidden behind paywalls.</p>
+  </div>
+</div>
+
+<h2>The Business Case</h2>
+
+<h3>Data Portability</h3>
+<p>When you decide to switch tools, your data comes with you. The SQLite file contains the complete schema — <code>visitor_views</code>, <code>semantic_events</code>, daily rollups — all documented and queryable. Export to CSV, import into DuckDB, feed into a data warehouse. No "please wait 48 hours for your data export" emails.</p>
+
+<h3>Compliance</h3>
+<p>GDPR Article 20 gives users the right to data portability. When your analytics data lives in a single SQLite file with a documented schema, responding to data requests is straightforward: query the database, export the rows, done. No navigating a vendor's admin panel hoping they have an export button. No wondering what they kept after you hit "delete."</p>
+<p>Because Echelon is cookieless by default (daily-rotating HMAC hashes, no cross-day tracking), most deployments don't require cookie consent banners at all — simplifying your compliance posture further.</p>
+
+<h3>Business Continuity</h3>
+<p>Third-party analytics services shut down, get acquired, change pricing, or deprecate features. When your analytics are self-hosted, none of that matters. Your data survives vendor decisions because it was never on their servers. The AGPL-3.0 license guarantees you can always run, modify, and distribute the software.</p>
+
+<h2>How Echelon Delivers</h2>
+
+<div class="card">
+  <h3>Single SQLite File</h3>
+  <p>All analytics data lives in one <code>.sqlite</code> file. Back it up with <code>cp</code>. Move it with <code>scp</code>. Query it with any SQLite client. The database uses WAL mode for concurrent reads during writes, and the schema is fully documented in the <a href="portable-data.html">Portable Data</a> reference.</p>
+</div>
+
+<div class="card">
+  <h3>Self-Hosted</h3>
+  <p>Run Echelon on your own server, VPS, or container. Data never leaves your infrastructure. Deploy with Docker, Deno, or behind a reverse proxy — your choice. See the <a href="installation.html">Installation</a> guide for all deployment options.</p>
+</div>
+
+<div class="card">
+  <h3>Open Schema</h3>
+  <p>The database schema is documented and stable. Tables like <code>visitor_views</code>, <code>semantic_events</code>, and <code>visitor_views_daily</code> are designed for direct SQL access. Raw visitor data is retained for 90 days, daily rollups for 2 years. Re-analyze with different bot score thresholds at any time.</p>
+</div>
+
+<div class="card">
+  <h3>Full REST API</h3>
+  <p>Every piece of data the admin dashboard shows is available through the <a href="api.html">REST API</a>. Build custom dashboards, integrate with CI/CD pipelines, pull data into external tools — all with standard HTTP requests and JSON responses.</p>
+</div>
+
+<div class="card">
+  <h3>MCP Server</h3>
+  <p>The <a href="mcp.html">Model Context Protocol server</a> lets AI agents query your analytics directly. Ask Claude "how's my site doing?" and it fetches real data from your Echelon instance. 9 read-only tools, no raw SQL exposure, no PII leakage.</p>
+</div>
+
+<div class="card">
+  <h3>AGPL-3.0 Licensed</h3>
+  <p>The source code is open, the license is copyleft. You can inspect every line, verify what data is collected, and modify the software to fit your needs. No black boxes, no "trust us" — verify it yourself.</p>
+</div>
+
+<h2>Open Access</h2>
+<p>Data ownership means nothing if you can't actually access your data. Echelon provides multiple access paths — from raw SQL to REST API to AI-native interfaces — so your analytics are available however you need them.</p>
+
+<div class="features">
+  <div class="feature">
+    <h3>Direct SQL</h3>
+    <p>Open the SQLite file with any client. Run ad-hoc queries, create views, export to CSV. The <a href="portable-data.html">schema is documented</a> and designed for direct access.</p>
+  </div>
+  <div class="feature">
+    <h3>REST API</h3>
+    <p>Every dashboard metric is available via <a href="api.html">HTTP endpoints</a>. Build integrations, feed dashboards, automate reports — no screen-scraping needed.</p>
+  </div>
+  <div class="feature">
+    <h3>MCP for AI Agents</h3>
+    <p>The <a href="mcp.html">MCP server</a> gives Claude and other AI agents structured access to your analytics. Ask questions in plain language, get answers from real data.</p>
+  </div>
+  <div class="feature">
+    <h3>Open Source</h3>
+    <p>AGPL-3.0 means the code is yours to audit, modify, and extend. Add custom endpoints, change retention rules, or fork the entire project.</p>
+  </div>
+</div>
+
+<p class="seal-tip">🗄️ "Your data, your database, your rules. That's not a tagline — it's the architecture." -<span class="seal">🦭</span></p>
+
+<hr>
+<div class="doc-nav">
+  <a href="installation.html">Installation</a>
+  <a href="features.html">Features</a>
+  <a href="api.html">API Reference</a>
+  <a href="bot-defense.html">Bot Defense</a>
+  <a href="configuration.html">Configuration</a>
+  <a href="architecture.html">Architecture</a>
+  <a href="portable-data.html">Portable Data</a>
+  <a href="mcp.html">MCP Server</a>
+  <a href="telemetry.html">Telemetry</a>
+  <a href="why-ea.html">Why ea.js?</a>
+</div>
+</main>
+
+<footer class="footer">
+  <div class="quote">🛢️ "Data er den nye oljen!" -🦭</div>
+  <div class="links">AGPL-3.0 — Copyright (C) 2026 Jani Tarvainen — <a href="https://github.com/janit/ea">GitHub</a></div>
+</footer>
+
+<script>(function(){var h=document.querySelector(".site-header");if(!h)return;var inner=h.querySelector(".site-header-inner");function check(){h.removeAttribute("data-collapsed");h.classList.remove("nav-open");if(inner.scrollWidth>inner.clientWidth+2)h.setAttribute("data-collapsed","");}window.addEventListener("resize",check);check();h.style.visibility="";})()</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import { generateChallenge, getWasmBase64 } from "./challenge.ts";
 import { ALLOWED_ORIGINS, COOKIE_CONSENT, TRUST_PROXY } from "./config.ts";
 import { isDebugEnabled } from "./debug.ts";
 import { getConsentCss } from "./consent-css.ts";
+import { shouldAnonymize } from "./anonymize.ts";
 
 const TRACKER_SOURCE = `(function(){
 "use strict";
@@ -52,8 +53,21 @@ if (wantCookie) {
 if (wantCookie) cookieConsented = 1;
 /*NOCONSENT_END*/
 var _dbg = __ECHELON_DEBUG__;
+var _anon = __ECHELON_ANON__;
 function dbg() { if (_dbg) console.log.apply(console, ["[echelon:debug]"].concat(Array.prototype.slice.call(arguments))); }
 if (_dbg) dbg("hello from echelon");
+// Scramble text: replace each letter with a random letter, digits with random digit, keep punctuation
+function scramble(s) {
+  if (!_anon || !s) return s;
+  for (var i = 0, r = ""; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c >= 65 && c <= 90) r += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    else if (c >= 97 && c <= 122) r += String.fromCharCode(97 + Math.floor(Math.random() * 26));
+    else if (c >= 48 && c <= 57) r += String.fromCharCode(48 + Math.floor(Math.random() * 10));
+    else r += s[i];
+  }
+  return r;
+}
 
 var wantClicks = !sc.hasAttribute("data-no-clicks");
 var wantScroll = !sc.hasAttribute("data-no-scroll");
@@ -413,24 +427,63 @@ if (wantHover) {
   }, { passive: true });
 }
 
-// ── 7. Form Submission Tracking (on by default, opt-out: data-no-forms) ─────
-if (wantForms) document.addEventListener("submit", function(e) {
-  if (!e.isTrusted) return;
-  var form = e.target;
-  if (!form || form.tagName !== "FORM") return;
-  var d = {
-    action: (form.action || "").slice(0, 256),
-    method: (form.method || "GET").toUpperCase(),
-    id: (form.id || "").slice(0, 64),
-    name: (form.name || "").slice(0, 64),
-    path: location.pathname
-  };
-  // Include data-echelon-form label if present
-  if (form.dataset && form.dataset.echelonForm) {
-    d.label = form.dataset.echelonForm;
+// ── 7. Form Tracking (on by default, opt-out: data-no-forms) ─────────────
+if (wantForms) {
+  var FORM_FIELDS = { INPUT: 1, SELECT: 1, TEXTAREA: 1 };
+  function formMeta(el) {
+    var form = el.form || up(el, function(n) { return n.tagName === "FORM"; });
+    return {
+      tag: el.tagName,
+      input_type: (el.type || "").slice(0, 32),
+      field_name: (el.name || "").slice(0, 64),
+      form_id: form ? (form.id || "").slice(0, 64) : "",
+      form_name: form ? (form.name || "").slice(0, 64) : "",
+      path: location.pathname
+    };
   }
-  sendEvents([{ type: "form_submit", data: d, sessionId: sid }]);
-}, { passive: true });
+
+  // Focus on form field
+  document.addEventListener("focusin", function(e) {
+    if (!e.isTrusted) return;
+    var el = e.target;
+    if (!el || !FORM_FIELDS[el.tagName]) return;
+    sendEvents([{ type: "form_focus", data: formMeta(el), sessionId: sid }]);
+  }, { passive: true });
+
+  // Field value changed (fires on blur after edit)
+  var SENSITIVE = { password: 1, hidden: 1 };
+  document.addEventListener("change", function(e) {
+    if (!e.isTrusted) return;
+    var el = e.target;
+    if (!el || !FORM_FIELDS[el.tagName]) return;
+    var d = formMeta(el);
+    var v = (el.value || "");
+    d.value_length = v.length;
+    // Include value for non-sensitive fields (passwords, hidden fields excluded)
+    if (!SENSITIVE[(el.type || "").toLowerCase()]) {
+      d.value = scramble(v.slice(0, 256));
+    }
+    sendEvents([{ type: "form_blur", data: d, sessionId: sid }]);
+  }, { passive: true });
+
+  // Form submission
+  document.addEventListener("submit", function(e) {
+    if (!e.isTrusted) return;
+    var form = e.target;
+    if (!form || form.tagName !== "FORM") return;
+    var d = {
+      action: (form.action || "").slice(0, 256),
+      method: (form.method || "GET").toUpperCase(),
+      id: (form.id || "").slice(0, 64),
+      name: (form.name || "").slice(0, 64),
+      path: location.pathname
+    };
+    if (form.dataset && form.dataset.echelonForm) {
+      d.label = form.dataset.echelonForm;
+    }
+    sendEvents([{ type: "form_submit", data: d, sessionId: sid }]);
+  }, { passive: true });
+}
 
 // ── 8. Web Vitals (on by default, opt-out: data-no-vitals) ─────────────────
 if (wantVitals && typeof PerformanceObserver !== "undefined") {
@@ -678,7 +731,11 @@ export async function handleTracker(req: Request): Promise<Response> {
     .replace("__ECHELON_CHALLENGE__", () => safeChallenge)
     .replace("__ECHELON_WASM_B64__", () => safeWasm)
     .replace("__ECHELON_CONSENT_CSS__", () => safeCss)
-    .replace("__ECHELON_DEBUG__", () => isDebugEnabled() ? "true" : "false");
+    .replace("__ECHELON_DEBUG__", () => isDebugEnabled() ? "true" : "false")
+    .replace(
+      "__ECHELON_ANON__",
+      () => shouldAnonymize(siteId) ? "true" : "false",
+    );
 
   return new Response(script, { headers: SCRIPT_HEADERS });
 }

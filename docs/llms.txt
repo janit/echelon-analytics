@@ -50,6 +50,7 @@ Full-featured admin UI at `/admin/` with:
 - [Architecture](https://ea.js.org/architecture.html): Request flow, database schema, data pipeline, theming
 - [Portable Data](https://ea.js.org/portable-data.html): SQLite schema, example queries, data lifecycle
 - [MCP Server](https://ea.js.org/mcp.html): Model Context Protocol server for AI agent integration
+- [Data Ownership & Open Access](https://ea.js.org/data-ownership.html): First-party data principles — no vendor lock-in, no sampling, full SQL access, AGPL-3.0
 - [Telemetry](https://ea.js.org/telemetry.html): Opt-in anonymous admin usage data — what it collects, how to control it
 - [Full Documentation for LLMs](https://ea.js.org/llms-full.txt): Complete reference in a single file
 

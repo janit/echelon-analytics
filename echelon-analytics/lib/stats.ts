@@ -2,6 +2,7 @@
 
 import type { DbAdapter } from "./db/adapter.ts";
 import type { ExperimentStats, VariantStats } from "../types.ts";
+import { terminalDisplayName } from "./anonymize.ts";
 
 /**
  * A/B experiment results with two-proportion z-test significance.
@@ -214,7 +215,7 @@ export async function getOverview(
     pathCutoff + "T00:00:00Z",
   );
 
-  const resolutions = await db.query<{
+  const resolutions = (await db.query<{
     resolution: string;
     views: number;
     visitors: number;
@@ -225,7 +226,7 @@ export async function getOverview(
      GROUP BY resolution ORDER BY views DESC LIMIT 20`,
     siteId,
     pathCutoff + "T00:00:00Z",
-  );
+  )).map((r) => ({ ...r, resolution: terminalDisplayName(r.resolution) }));
 
   const dailyTrend = await db.query<{
     date: string;

@@ -133,10 +133,43 @@ Deno.test("anonymizeView — preserves non-anonymized fields", async () => {
   assertEquals(anon.path, original.path);
   assertEquals(anon.site_id, original.site_id);
   assertEquals(anon.interaction_ms, original.interaction_ms);
-  assertEquals(anon.screen_width, original.screen_width);
-  assertEquals(anon.device_type, original.device_type);
   assertEquals(anon.bot_score, original.bot_score);
   assertEquals(anon.is_pwa, original.is_pwa);
+});
+
+Deno.test("anonymizeView — maps screen size to terminal resolution", async () => {
+  const anon = await anonymizeView(
+    baseView({ screen_width: 1440, screen_height: 900 }),
+  );
+  assertNotEquals(anon.screen_width, 1440);
+  assertNotEquals(anon.screen_height, 900);
+  assertEquals(typeof anon.screen_width, "number");
+  assertEquals(typeof anon.screen_height, "number");
+  // Deterministic: same input → same terminal
+  const anon2 = await anonymizeView(
+    baseView({ screen_width: 1440, screen_height: 900 }),
+  );
+  assertEquals(anon.screen_width, anon2.screen_width);
+  assertEquals(anon.screen_height, anon2.screen_height);
+});
+
+Deno.test("anonymizeView — maps os_name to tropical bird", async () => {
+  const anon = await anonymizeView(baseView({ os_name: "macOS 10.15" }));
+  assertNotEquals(anon.os_name, "macOS 10.15");
+  assertEquals(typeof anon.os_name, "string");
+  // Deterministic: same input → same bird
+  const anon2 = await anonymizeView(baseView({ os_name: "macOS 10.15" }));
+  assertEquals(anon.os_name, anon2.os_name);
+});
+
+Deno.test("anonymizeView — maps device_type to vessel class", async () => {
+  const anon = await anonymizeView(baseView({ device_type: "desktop" }));
+  assertEquals(anon.device_type, "mothership");
+});
+
+Deno.test("anonymizeEvent — maps device_type to vessel class", async () => {
+  const anon = await anonymizeEvent(baseEvent({ device_type: "mobile" }));
+  assertEquals(anon.device_type, "probe");
 });
 
 // ── anonymizeEvent ──────────────────────────────────────────────────────────
@@ -162,9 +195,30 @@ Deno.test("anonymizeEvent — replaces referrer with NSA codename URL", async ()
   );
 });
 
-Deno.test("anonymizeEvent — wipes data field to empty JSON", async () => {
-  const anon = await anonymizeEvent(baseEvent());
-  assertEquals(anon.data, "{}");
+Deno.test("anonymizeEvent — sanitizes data to safe behavioral keys only", async () => {
+  // click event: keeps "tag" and "path", strips "target"
+  const clickEvent = baseEvent({
+    event_type: "click",
+    data: '{"target":"button","tag":"A","path":"/about"}',
+  });
+  const anon = await anonymizeEvent(clickEvent);
+  assertEquals(anon.data, '{"tag":"A","path":"/about"}');
+
+  // scroll_depth: keeps "depth" and "path"
+  const scrollEvent = baseEvent({
+    event_type: "scroll_depth",
+    data: '{"depth":75,"path":"/page","secret":"x"}',
+  });
+  const anonScroll = await anonymizeEvent(scrollEvent);
+  assertEquals(anonScroll.data, '{"depth":75,"path":"/page"}');
+
+  // unknown event type: stripped entirely
+  const unknownEvent = baseEvent({
+    event_type: "custom",
+    data: '{"foo":"bar"}',
+  });
+  const anonUnknown = await anonymizeEvent(unknownEvent);
+  assertEquals(anonUnknown.data, "{}");
 });
 
 Deno.test("anonymizeEvent — anonymizes experiment and variant IDs", async () => {

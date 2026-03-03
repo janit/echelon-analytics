@@ -6,6 +6,7 @@ import BotActions from "../../../islands/BotActions.tsx";
 import BotScoreDetail from "../../../islands/BotScoreDetail.tsx";
 import { PUBLIC_MODE } from "../../../lib/config.ts";
 import { formatTime } from "../../../lib/format.ts";
+import { terminalDisplayName } from "../../../lib/anonymize.ts";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -138,7 +139,9 @@ export default define.page<typeof handler>(function VisitorDetailPage({
                 </td>
                 <td class="px-4 py-1.5 text-[var(--ea-text)] tabular-nums">
                   {v.screen_width
-                    ? `${v.screen_width}x${v.screen_height}`
+                    ? terminalDisplayName(
+                      `${v.screen_width}x${v.screen_height}`,
+                    )
                     : "-"}
                 </td>
                 <td class="px-4 py-1.5 text-[var(--ea-text)]">

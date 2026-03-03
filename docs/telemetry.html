@@ -24,17 +24,35 @@
   <div class="site-header-inner">
     <a href="/" class="logo">Echelon <span>🩺</span></a>
     <button class="nav-toggle" aria-label="Menu" onclick="this.closest('.site-header').classList.toggle('nav-open')">🍔</button>
-    <a href="installation.html">Installation</a>
-    <a href="features.html">Features</a>
-    <a href="api.html">API</a>
-    <a href="bot-defense.html">Bot Defense</a>
-    <a href="configuration.html">Config</a>
-    <a href="architecture.html">Architecture</a>
-    <a href="portable-data.html">Portable Data</a>
-      <a href="mcp.html">MCP</a>
-    <a href="telemetry.html">Telemetry</a>
-    <a href="why-ea.html">Why ea.js?</a>
-    <a href="https://ea.islets.app/admin?site_id=ea">Try it</a>
+    <div class="nav-links">
+      <a href="why-ea.html">Why ea.js?</a>
+      <div class="nav-group">
+        <a href="data-ownership.html" class="nav-group-label">Data Ownership &amp; Open Access <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="data-ownership.html">Data Ownership &amp; Open Access</a>
+          <a href="portable-data.html">Portable Data</a>
+          <a href="api.html">API</a>
+          <a href="mcp.html">MCP</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="features.html" class="nav-group-label">Features <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="features.html">Features</a>
+          <a href="bot-defense.html">Bot Defense</a>
+          <a href="architecture.html">Architecture</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <a href="installation.html" class="nav-group-label">Installation <span class="caret">&#9662;</span></a>
+        <div class="nav-dropdown">
+          <a href="installation.html">Installation</a>
+          <a href="configuration.html">Configuration</a>
+        </div>
+      </div>
+      <a href="telemetry.html">Telemetry</a>
+    </div>
+    <a href="https://ea.islets.app/admin?site_id=ea" class="nav-cta" target="_blank" rel="noopener">Live demo &rarr;</a>
   </div>
 </header>
 
@@ -128,7 +146,10 @@
 <tr><td>Referrer</td><td>Replaced with a fictional NSA intranet URL (e.g. <code>https://nsa-intranet.gov/ops/PRISM-a3f2</code>)</td></tr>
 <tr><td>UTM params</td><td>Mapped to operation codenames (e.g. "operation-mockingbird")</td></tr>
 <tr><td>Experiments</td><td>Hashed to <code>experiment-&lt;hash&gt;</code> / <code>variant-&lt;hash&gt;</code></td></tr>
-<tr><td>Event data</td><td>Stripped to <code>{}</code> (may contain identifying info)</td></tr>
+<tr><td>Screen size</td><td>Mapped to classic terminal resolutions (e.g. 1920&times;1080 &rarr; 80&times;25 IBM PC)</td></tr>
+<tr><td>OS name</td><td>Mapped to a tropical bird name (e.g. &ldquo;macOS 10.15&rdquo; &rarr; &ldquo;Scarlet Macaw&rdquo;)</td></tr>
+<tr><td>Device type</td><td>Mapped to sci-fi vessel classes (e.g. &ldquo;desktop&rdquo; &rarr; &ldquo;mothership&rdquo;)</td></tr>
+<tr><td>Event data</td><td>Sanitized to safe behavioral keys only (e.g. scroll depth, dwell time, metric values, HTML tag names). URLs, user text, and custom attributes are stripped.</td></tr>
 <tr><td>Path</td><td>Kept as-is (admin panel paths like <code>/admin/visitors</code> are not sensitive)</td></tr>
 </table>
 <p>All mappings are deterministic within a day (same input &rarr; same output), so analytics aggregation works correctly. The mappings rotate daily and are not reversible.</p>
@@ -194,10 +215,10 @@
   <a href="bot-defense.html">Bot Defense</a>
   <a href="configuration.html">Configuration</a>
   <a href="architecture.html">Architecture</a>
+  <a href="data-ownership.html">Data Ownership &amp; Open Access</a>
   <a href="portable-data.html">Portable Data</a>
   <a href="mcp.html">MCP Server</a>
   <a href="why-ea.html">Why ea.js?</a>
-    
 </div>
 </main>
 

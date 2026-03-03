@@ -227,6 +227,154 @@ const OPERATION_CODENAMES = [
   "operation-wrath-of-god",
 ];
 
+// ── Screen / OS anonymization ─────────────────────────────────────────────
+// Map screen dimensions to classic computer terminal resolutions via
+// deterministic HMAC hash so the original values are not recoverable.
+
+const TERMINAL_RESOLUTIONS: [number, number, string][] = [
+  [40, 24, "Commodore 64"],
+  [80, 24, "VT100"],
+  [80, 25, "IBM PC"],
+  [80, 43, "EGA"],
+  [80, 50, "VGA"],
+  [132, 24, "VT100 wide"],
+  [132, 43, "VT220 wide"],
+  [128, 48, "Wyse 60"],
+  [160, 50, "Sun console"],
+  [80, 34, "Atari ST"],
+  [64, 32, "ZX Spectrum"],
+  [40, 25, "Apple II"],
+  [80, 48, "Amiga"],
+  [80, 60, "SVGA"],
+  [120, 50, "DEC VT320"],
+  [80, 30, "xterm"],
+];
+
+/** Lookup map: "WxH" → "W×H (Terminal Name)" for display in the admin UI. */
+const TERMINAL_DISPLAY: Map<string, string> = new Map(
+  TERMINAL_RESOLUTIONS.map(([w, h, name]) => [
+    `${w}x${h}`,
+    `${w}\u00d7${h} (${name})`,
+  ]),
+);
+
+/** Format a resolution string with terminal name if it matches a known terminal. */
+export function terminalDisplayName(resolution: string): string {
+  return TERMINAL_DISPLAY.get(resolution) ?? resolution;
+}
+
+async function anonymizeScreenSize(
+  w: number | null,
+  h: number | null,
+): Promise<[number | null, number | null]> {
+  if (w == null && h == null) return [null, null];
+  const input = `${w ?? 0}x${h ?? 0}`;
+  const hash = await hmacHex(input);
+  const term = TERMINAL_RESOLUTIONS[
+    pickIndex(hash, TERMINAL_RESOLUTIONS.length)
+  ];
+  return [term[0], term[1]];
+}
+
+const TROPICAL_BIRDS = [
+  "Scarlet Macaw",
+  "Hyacinth Macaw",
+  "Keel-billed Toucan",
+  "Resplendent Quetzal",
+  "Blue-and-yellow Macaw",
+  "Eclectus Parrot",
+  "Sun Conure",
+  "Rainbow Lorikeet",
+  "Flamingo",
+  "Golden Pheasant",
+  "Lilac-breasted Roller",
+  "Mandarin Duck",
+  "Paradise Tanager",
+  "Crimson Rosella",
+  "Painted Bunting",
+  "Turquoise-browed Motmot",
+  "Red-legged Honeycreeper",
+  "Superb Bird-of-Paradise",
+  "King Vulture",
+  "Harpy Eagle",
+  "Jabiru Stork",
+  "Hoatzin",
+  "Cock-of-the-rock",
+  "Blue-crowned Motmot",
+];
+
+/** Map OS name to a tropical bird via deterministic HMAC hash */
+async function anonymizeOsName(os: string | null): Promise<string | null> {
+  if (!os) return null;
+  const hash = await hmacHex(os);
+  return TROPICAL_BIRDS[pickIndex(hash, TROPICAL_BIRDS.length)];
+}
+
+/** Map device types to sci-fi vessel classes */
+const DEVICE_TYPE_MAP: Record<string, string> = {
+  desktop: "mothership",
+  tablet: "shuttle",
+  mobile: "probe",
+};
+
+function anonymizeDeviceType(dt: string | null): string | null {
+  if (!dt) return null;
+  return DEVICE_TYPE_MAP[dt.toLowerCase()] ?? "unknown-vessel";
+}
+
+// ── Event data sanitization ───────────────────────────────────────────────
+// Per-event-type allowlists of data keys that are safe to keep (behavioral
+// metrics only — no URLs, no user-supplied text, no custom attributes).
+
+const SAFE_EVENT_KEYS: Record<string, Set<string>> = {
+  scroll_depth: new Set(["depth", "path"]),
+  bounce: new Set(["dwell", "trigger", "path"]),
+  session_end: new Set(["dwell_s", "path"]),
+  session_resume: new Set(["path"]),
+  web_vital: new Set(["metric", "value", "rating", "path"]),
+  click: new Set(["tag", "path"]),
+  ad_click: new Set(["tag", "path"]),
+  hover: new Set(["tag", "path"]),
+  form_focus: new Set([
+    "tag",
+    "input_type",
+    "field_name",
+    "form_id",
+    "form_name",
+    "path",
+  ]),
+  form_blur: new Set([
+    "tag",
+    "input_type",
+    "field_name",
+    "form_id",
+    "form_name",
+    "value",
+    "value_length",
+    "path",
+  ]),
+  form_submit: new Set(["method", "id", "name", "label", "path"]),
+  outbound: new Set(["host", "path"]),
+  download: new Set(["ext", "path"]),
+};
+
+/** Strip event data to only safe behavioral keys for the given event type. */
+function sanitizeEventData(eventType: string, dataStr: string): string {
+  const allowed = SAFE_EVENT_KEYS[eventType];
+  if (!allowed) return "{}";
+  try {
+    const parsed = JSON.parse(dataStr);
+    if (typeof parsed !== "object" || parsed === null) return "{}";
+    const clean: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in parsed) clean[key] = parsed[key];
+    }
+    return JSON.stringify(clean);
+  } catch {
+    return "{}";
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export function shouldAnonymize(siteId: string): boolean {
@@ -237,6 +385,10 @@ export async function anonymizeView(record: ViewRecord): Promise<ViewRecord> {
   const vidHash = await hmacHex(record.visitor_id);
   const sidHash = record.session_id ? await hmacHex(record.session_id) : null;
   const refHash = record.referrer ? await hmacHex(record.referrer) : null;
+  const [anonWidth, anonHeight] = await anonymizeScreenSize(
+    record.screen_width,
+    record.screen_height,
+  );
 
   return {
     ...record,
@@ -247,6 +399,10 @@ export async function anonymizeView(record: ViewRecord): Promise<ViewRecord> {
     country_code: record.country_code
       ? PLANETS[pickIndex(await hmacHex(record.country_code), PLANETS.length)]
       : null,
+    screen_width: anonWidth,
+    screen_height: anonHeight,
+    device_type: anonymizeDeviceType(record.device_type),
+    os_name: await anonymizeOsName(record.os_name),
     referrer: refHash
       ? `https://nsa-intranet.gov/ops/${
         NSA_CODENAMES[pickIndex(refHash, NSA_CODENAMES.length)]
@@ -296,12 +452,13 @@ export async function anonymizeEvent(
     session_id: sidHash
       ? FISHERMEN[pickIndex(sidHash, FISHERMEN.length)]
       : null,
+    device_type: anonymizeDeviceType(record.device_type) ?? "unknown-vessel",
     referrer: refHash
       ? `https://nsa-intranet.gov/ops/${
         NSA_CODENAMES[pickIndex(refHash, NSA_CODENAMES.length)]
       }-${refHash.slice(0, 4)}`
       : null,
-    data: "{}",
+    data: sanitizeEventData(record.event_type, record.data ?? "{}"),
     experiment_id: record.experiment_id
       ? `experiment-${(await hmacHex(record.experiment_id)).slice(0, 8)}`
       : record.experiment_id,
