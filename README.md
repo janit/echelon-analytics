@@ -15,8 +15,9 @@ feels like opening Microsoft Word when all you want is a text editor.
 
 So I built my own analytics for a hobby project
 ([afroute.com](https://afroute.com)). It started simple — just pageviews and
-basic stats — but grew in functionality over time. Eventually I wanted to rip it
-out into its own project, and figured: why not share it?
+basic stats — but grew in functionality over time. When I started work on
+([Islets Spatial CMS](https://islets.app)), I decided to split it out into
+its own project, and figured: why not share?
 
 ## WASM Proof-of-Work Bot Defense
 
