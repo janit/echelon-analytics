@@ -1,8 +1,7 @@
 # Privacy Policy Template — Echelon Analytics
 
 > **Instructions**: Replace all `[bracketed placeholders]` with your values.
-> Delete sections that don't apply to your deployment. This template covers the
-> full Echelon Analytics feature set — most deployments won't use everything.
+> Delete any optional sections that don't apply to your deployment.
 
 ---
 
@@ -14,6 +13,10 @@
 (the "Service"). This policy describes what data we collect, why we collect it,
 how we process it, and your rights regarding that data.
 
+We use [Echelon Analytics](https://ea.js.org) for self-hosted web analytics.
+All analytics data is processed and stored on our own infrastructure — it is
+never sent to third-party analytics services.
+
 ### 1. Data We Collect
 
 #### 1.1 Analytics Data (Collected Automatically)
@@ -24,103 +27,105 @@ you personally**.
 
 | Data | Purpose | Example |
 |------|---------|---------|
-| Pages visited | Understand popular content | `/helsinki/tampere` |
+| Pages visited | Understand popular content | `/about` |
 | Device type | Optimize for mobile/desktop | `mobile`, `desktop` |
 | Screen resolution | Responsive design testing | `375x812` |
 | Operating system | Browser compatibility | `iOS`, `Android` |
 | Country | Regional content relevance | `FI`, `US` |
 | Referrer origin | Understand traffic sources | `google.com` |
 | Interaction time | Measure engagement quality | `4200ms` |
-| Anonymous visitor ID | Distinguish unique visits | Random 16-character code |
+| Scroll depth | Understand reading behavior | `75%` |
+| Anonymous visitor ID | Distinguish unique visits | Random 16-character hex code |
 
 **What we do NOT collect:**
 
 - Your name, email address, or any account information
-- Your IP address (we only use it transiently for rate limiting — it is never
+- Your IP address (used transiently for visitor hashing and rate limiting — never
   stored in our database)
-- Precise geolocation (country is derived from CDN headers, not GPS)
+- Precise geolocation (country is derived from request headers, not GPS)
 - Browser fingerprints
 - Cross-site tracking data
-- Keystrokes, form inputs, or page content you view
 
 #### 1.2 Behavioral Events
 
-We record anonymous interactions such as route calculations, map interactions,
-and feature usage. Each event records:
+We record anonymous interactions such as clicks, outbound link clicks, file
+downloads, and form interactions (focus/edit/submit — not form content). Each
+event records:
 
-- The type of action (e.g., "route calculated", "search performed")
-- Contextual data about the action (e.g., search query, distance calculated)
+- The type of action (e.g., "click", "outbound", "download", "scroll_depth")
+- Contextual metadata (e.g., link URL, file extension, scroll percentage)
 - The anonymous visitor ID and session ID
 - Device type and country
 
 These events help us understand which features are useful and where users
 encounter friction.
 
-[DELETE IF NOT APPLICABLE]
+> [DELETE section 1.2 if you disable event tracking with `data-no-clicks`,
+> `data-no-scroll`, `data-no-outbound`, `data-no-downloads`, `data-no-forms`]
 
-#### 1.3 Feedback Data
+#### 1.3 Performance Metrics
 
-If you voluntarily submit feedback (e.g., via a satisfaction survey), we collect:
+We collect anonymous Core Web Vitals (LCP, CLS, INP) to monitor page load
+performance and user experience quality. These measurements contain no personal
+data — only metric name, value, and rating (good/needs-improvement/poor).
 
-- Your numeric rating
-- Your written feedback (free text)
-- Your anonymous visitor ID and device/country context
+> [DELETE section 1.3 if you disable vitals with `data-no-vitals`]
 
-We automatically strip any personal information you may accidentally include in
-feedback text — email addresses, phone numbers, and URLs are masked before
-storage.
+#### 1.4 UTM Campaign Data
 
-[DELETE IF NOT APPLICABLE]
+If you arrive via a link containing UTM parameters (e.g., `utm_source`,
+`utm_campaign`), we record those marketing attribution values alongside your
+anonymous visit. This helps us understand which campaigns drive traffic.
 
-#### 1.4 Bot Detection
+#### 1.5 A/B Experiment Data
+
+We may run anonymous split tests to measure the impact of changes to the
+Service. If you are part of an experiment, we record which variant you saw and
+whether a conversion event occurred. Variant assignment is random and anonymous.
+
+> [DELETE sections 1.4 and/or 1.5 if you don't use campaigns or experiments]
+
+#### 1.6 Bot Detection
 
 To protect the Service from automated abuse, we score each request using
 behavioral signals such as interaction timing, request frequency, and header
-presence. This scoring:
+analysis. This system:
 
 - Uses a one-way hash of your IP address that rotates every 24 hours
 - Does not store your IP address
-- Does not affect legitimate users — it only throttles automated traffic
+- Does not affect legitimate users — it only filters automated traffic
 
-### 2. Cookies
+### 2. Visitor Identity
 
-We use the following cookies:
+By default, visitors are identified using a daily-rotating one-way hash of
+IP address + User-Agent + site ID + date. This means:
 
-| Cookie | Purpose | Duration | Type |
-|--------|---------|----------|------|
+- Your identity resets every day — no cross-day tracking
+- The hash cannot be reversed to recover your IP address
+- No cookie consent is required (GDPR/ePrivacy compliant)
+
+**If persistent cookies are enabled** (`data-cookie` attribute), we set a single
+cookie:
+
+| Cookie | Purpose | Duration | Attributes |
+|--------|---------|----------|------------|
 | `_ev` | Anonymous visitor ID (random hex) | 30 days | HttpOnly, Secure, SameSite=None, Partitioned |
 
-This cookie is **strictly functional** — it contains a random 16-character
-identifier that cannot be linked to your identity. We do not use advertising
-cookies, tracking pixels, or third-party cookie-syncing services.
+This cookie contains a random 16-character identifier that cannot be linked to
+your identity. We do not use advertising cookies, tracking pixels, or
+third-party cookie services.
 
 Session data is stored in your browser's sessionStorage and is automatically
 cleared when you close the tab.
 
 ### 3. Third-Party Data Sharing
 
-[CHOOSE ONE OF THE FOLLOWING OPTIONS]
-
-**Option A — GA4 enabled:**
-
-We forward anonymous analytics data to Google Analytics 4 (GA4) for aggregated
-reporting. Before forwarding:
-
-- Your IP address is masked (last segment zeroed)
-- Only anonymous identifiers are sent (no personal data)
-- Requests identified as bots are excluded
-
-Google's privacy policy applies to data they receive:
-https://policies.google.com/privacy
-
-We do not share data with any other third parties.
-
-**Option B — No third-party sharing:**
-
 We do not share your data with any third parties. All analytics data is
 processed and stored on our own infrastructure.
 
-[DELETE THE OPTION YOU DON'T USE]
+[IF YOU USE A CDN, ADD: "We use [CDN PROVIDER] as a CDN, which processes
+requests in accordance with their privacy policy: [CDN PRIVACY POLICY URL].
+Analytics data itself is stored exclusively on our servers."]
 
 ### 4. Data Storage and Security
 
@@ -129,51 +134,42 @@ processed and stored on our own infrastructure.
 - Data is transmitted over HTTPS (TLS encryption in transit)
 - Database access is restricted to authenticated application processes
 - Administrative access requires authentication and is rate-limited
-- [We use Cloudflare as a CDN, which processes requests in accordance with their
-  privacy policy: https://www.cloudflare.com/privacypolicy/]
+- Proof-of-work challenges protect tracking endpoints from abuse
 
 ### 5. Data Retention
 
 | Data type | Retention period |
 |-----------|-----------------|
-| Page view counts | [Indefinite / X months] |
-| Visitor view records | [X months / X years] |
-| Behavioral events | [X months / X years] |
-| Session summaries | [X months / X years] |
-| Feedback responses | [X months / X years] |
-| Bot detection hashes | 5 minutes (in memory only) |
+| Raw page views | [DEFAULT: 90 days] |
+| Raw behavioral events | [DEFAULT: 90 days] |
+| Aggregated daily summaries | [DEFAULT: 2 years] |
+| Bot detection IP hashes | 5 minutes (in memory only) |
+| Rate limiting data | 60 seconds (in memory only) |
 
-[ADJUST RETENTION PERIODS TO MATCH YOUR ACTUAL POLICY]
+After the retention period, raw data is automatically purged. Aggregated
+summaries contain no visitor-level data.
+
+[ADJUST RETENTION PERIODS TO MATCH YOUR `ECHELON_RETENTION_DAYS` SETTING]
 
 ### 6. Your Rights
 
-Depending on your jurisdiction, you may have the following rights:
+Since we collect only anonymous data with no account system, most requests
+require you to provide your anonymous visitor ID (found in the `_ev` cookie
+via your browser's developer tools, or not available if cookies are disabled).
 
 **Under GDPR (EU/EEA residents):**
 
-- **Right to access** — Request a copy of data associated with your anonymous
-  visitor ID
-- **Right to erasure** — Request deletion of data associated with your anonymous
-  visitor ID
+- **Right to access** — Request a copy of data associated with your visitor ID
+- **Right to erasure** — Request deletion of data associated with your visitor ID
 - **Right to object** — Object to processing of your data
-- **Right to restriction** — Request that we limit how we process your data
+- **Right to restriction** — Request limitation of processing
 - **Right to data portability** — Receive your data in a machine-readable format
-
-Since we collect only anonymous data with no account system, exercising these
-rights requires you to provide your anonymous visitor ID (found in the `_ev`
-cookie in your browser's developer tools).
 
 **Under CCPA (California residents):**
 
 - You have the right to know what data we collect (described above)
 - You have the right to request deletion of your data
 - We do not sell personal information
-
-**Under NDPA 2023 (Nigerian residents):**
-
-- You have the right to access, rectify, and delete your data
-- You have the right to object to data processing
-- We process data based on legitimate interest (anonymous analytics)
 
 **To exercise any of these rights**, contact us at [CONTACT EMAIL].
 
@@ -186,10 +182,8 @@ your rights because:
 
 - All data is anonymous — it cannot identify you
 - No sensitive personal data is processed
-- You can clear the visitor cookie at any time
+- Visitor identity resets daily (or you can clear the cookie at any time)
 - The processing has minimal impact on your privacy
-
-[IF YOU USE CONSENT-BASED PROCESSING INSTEAD, REPLACE THIS SECTION]
 
 ### 8. Children's Privacy
 
@@ -199,36 +193,29 @@ provided us with personal data, contact us at [CONTACT EMAIL].
 
 ### 9. International Data Transfers
 
-[CHOOSE ONE]
+Our servers are located in [COUNTRY]. If you access the Service from outside
+[COUNTRY], your anonymous analytics data will be transferred to and processed
+in [COUNTRY].
 
-**Option A**: Our servers are located in [COUNTRY]. If you access the Service
-from outside [COUNTRY], your anonymous analytics data will be transferred to and
-processed in [COUNTRY]. [For EU residents: we rely on Standard Contractual
-Clauses / adequacy decisions / other mechanism for this transfer.]
-
-**Option B**: We use Cloudflare as a CDN, which may process your request in any
-of their global data centers. The analytics data itself is stored on servers in
-[COUNTRY].
-
-[DELETE THE OPTION YOU DON'T USE]
+[FOR EU RESIDENTS, ADD IF APPLICABLE: "We rely on [Standard Contractual
+Clauses / adequacy decisions / other legal mechanism] for this transfer."]
 
 ### 10. Changes to This Policy
 
 We may update this policy from time to time. We will notify you of significant
-changes by [posting a notice on the Service / updating the "Last updated" date].
-Continued use of the Service after changes constitutes acceptance.
+changes by updating the "Last updated" date above. Continued use of the Service
+after changes constitutes acceptance.
 
 ### 11. Contact
 
 For privacy-related questions or to exercise your rights:
 
 - Email: [CONTACT EMAIL]
-- [Optional: postal address]
-- [Optional: data protection officer contact]
 
 ---
 
-> **Template version**: 1.0
-> **Covers**: Echelon Analytics — beacon tracking, semantic events, visitor
-> views, page views, bot scoring, session aggregation, A/B experiment
-> tracking, UTM campaign tracking.
+> **Template version**: 2.0
+> **Covers**: Echelon Analytics self-hosted analytics — pageview tracking,
+> behavioral events (clicks, scroll depth, outbound links, downloads, form
+> interactions), Core Web Vitals, bot scoring, UTM campaign tracking, A/B
+> experiment tracking.
