@@ -60,7 +60,7 @@ docker run -p 1947:1947 -v echelon-data:/app/data echelon-analytics
 
 The container exposes port 1947. Mount a volume at /app/data/ for the SQLite database.
 
-- Base image: denoland/deno:2.7.1
+- Base image: denoland/deno:2.7.12
 - Uses tini for proper PID 1 signal handling
 - Non-root user echelon (UID 1001)
 - Health check: GET /api/health every 30s

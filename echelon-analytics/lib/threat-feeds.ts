@@ -37,6 +37,13 @@ let crawlerPatternCount = 0;
 let aiCrawlerNameCount = 0;
 let dcRangeCount = 0;
 
+// Per-feed raw CIDR counts, retained across refreshes so a single upstream
+// failure doesn't silently erase the other feed's ranges.
+let awsV4Ranges: [number, number][] = [];
+let awsV6Ranges: [bigint, bigint][] = [];
+let gcpV4Ranges: [number, number][] = [];
+let gcpV6Ranges: [bigint, bigint][] = [];
+
 // ── Public matchers ─────────────────────────────────────────────────────────
 
 /** True if UA matches a known crawler pattern from the community feed. */
@@ -51,8 +58,12 @@ export function matchesAiCrawlerFeed(ua: string): boolean {
 
 /** True if the IP address falls within a known cloud provider CIDR (AWS/GCP). */
 export function isDatacenterIp(ip: string): boolean {
+  // Normalize IPv4-mapped IPv6 (::ffff:a.b.c.d and ::a.b.c.d) to plain IPv4
+  // so dual-stack deployments still match the IPv4 CIDR list.
+  const mapped = stripV4MappedPrefix(ip);
+
   // Try IPv4 first (most common)
-  const v4 = ipv4ToNum(ip);
+  const v4 = ipv4ToNum(mapped);
   if (v4 !== null) {
     return dcRangesV4.length > 0 && binarySearchRanges(v4, dcRangesV4);
   }
@@ -62,6 +73,19 @@ export function isDatacenterIp(ip: string): boolean {
     return dcRangesV6.length > 0 && binarySearchRangesV6(v6, dcRangesV6);
   }
   return false;
+}
+
+/** If ip is `::ffff:a.b.c.d` or `::a.b.c.d`, return the dotted quad. Otherwise return ip unchanged. */
+function stripV4MappedPrefix(ip: string): string {
+  const lower = ip.toLowerCase();
+  if (lower.startsWith("::ffff:")) {
+    const tail = ip.slice(7);
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(tail)) return tail;
+  } else if (lower.startsWith("::")) {
+    const tail = ip.slice(2);
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(tail)) return tail;
+  }
+  return ip;
 }
 
 // ── IPv4 utilities ──────────────────────────────────────────────────────────
@@ -311,10 +335,10 @@ async function refreshAiCrawlers(): Promise<void> {
 
 /** Fetch AWS + GCP IP ranges and build merged interval lists (v4 + v6). */
 async function refreshDatacenterIps(): Promise<void> {
-  const v4Ranges: [number, number][] = [];
-  const v6Ranges: [bigint, bigint][] = [];
-
   // AWS
+  let awsOk = false;
+  const newAwsV4: [number, number][] = [];
+  const newAwsV6: [bigint, bigint][] = [];
   try {
     const data = await fetchJson(AWS_IP_URL) as {
       prefixes?: { ip_prefix: string }[];
@@ -323,20 +347,24 @@ async function refreshDatacenterIps(): Promise<void> {
     if (Array.isArray(data?.prefixes)) {
       for (const p of data.prefixes) {
         const range = parseCidrV4(p.ip_prefix);
-        if (range) v4Ranges.push(range);
+        if (range) newAwsV4.push(range);
       }
     }
     if (Array.isArray(data?.ipv6_prefixes)) {
       for (const p of data.ipv6_prefixes) {
         const range = parseCidrV6(p.ipv6_prefix);
-        if (range) v6Ranges.push(range);
+        if (range) newAwsV6.push(range);
       }
     }
+    awsOk = newAwsV4.length > 0 || newAwsV6.length > 0;
   } catch (e) {
     console.warn("[echelon] threat-feeds: failed to fetch AWS IP ranges:", e);
   }
 
   // GCP
+  let gcpOk = false;
+  const newGcpV4: [number, number][] = [];
+  const newGcpV6: [bigint, bigint][] = [];
   try {
     const data = await fetchJson(GCP_IP_URL) as {
       prefixes?: { ipv4Prefix?: string; ipv6Prefix?: string }[];
@@ -345,38 +373,66 @@ async function refreshDatacenterIps(): Promise<void> {
       for (const p of data.prefixes) {
         if (p.ipv4Prefix) {
           const range = parseCidrV4(p.ipv4Prefix);
-          if (range) v4Ranges.push(range);
+          if (range) newGcpV4.push(range);
         }
         if (p.ipv6Prefix) {
           const range = parseCidrV6(p.ipv6Prefix);
-          if (range) v6Ranges.push(range);
+          if (range) newGcpV6.push(range);
         }
       }
     }
+    gcpOk = newGcpV4.length > 0 || newGcpV6.length > 0;
   } catch (e) {
     console.warn("[echelon] threat-feeds: failed to fetch GCP IP ranges:", e);
   }
 
-  const totalNew = v4Ranges.length + v6Ranges.length;
-  // Sanity check: reject suspiciously small refreshes
-  if (dcRangeCount > 0 && totalNew > 0 && totalNew < dcRangeCount * 0.1) {
-    console.warn(
-      `[echelon] threat-feeds: datacenter IP feed shrank from ${dcRangeCount} to ${totalNew} ranges — keeping old data`,
-    );
-    return;
+  // Per-feed sanity check: a single feed shrinking to <10% of its prior
+  // size (non-empty) is almost certainly a feed corruption — keep the old
+  // data for that feed only.
+  if (awsOk) {
+    const prior = awsV4Ranges.length + awsV6Ranges.length;
+    const next = newAwsV4.length + newAwsV6.length;
+    if (prior > 0 && next < prior * 0.1) {
+      console.warn(
+        `[echelon] threat-feeds: AWS feed shrank from ${prior} to ${next} ranges — keeping old data`,
+      );
+    } else {
+      awsV4Ranges = newAwsV4;
+      awsV6Ranges = newAwsV6;
+    }
   }
-  if (v4Ranges.length > 0) {
-    dcRangesV4 = mergeRanges(v4Ranges);
+  if (gcpOk) {
+    const prior = gcpV4Ranges.length + gcpV6Ranges.length;
+    const next = newGcpV4.length + newGcpV6.length;
+    if (prior > 0 && next < prior * 0.1) {
+      console.warn(
+        `[echelon] threat-feeds: GCP feed shrank from ${prior} to ${next} ranges — keeping old data`,
+      );
+    } else {
+      gcpV4Ranges = newGcpV4;
+      gcpV6Ranges = newGcpV6;
+    }
   }
-  if (v6Ranges.length > 0) {
-    dcRangesV6 = mergeRangesV6(v6Ranges);
+
+  // Rebuild the merged lookup tables from the retained per-feed ranges.
+  const combinedV4 = [...awsV4Ranges, ...gcpV4Ranges];
+  const combinedV6 = [...awsV6Ranges, ...gcpV6Ranges];
+  if (combinedV4.length > 0) {
+    dcRangesV4 = mergeRanges(combinedV4);
+  }
+  if (combinedV6.length > 0) {
+    dcRangesV6 = mergeRangesV6(combinedV6);
   }
   dcRangeCount = dcRangesV4.length + dcRangesV6.length;
 
-  const totalRaw = v4Ranges.length + v6Ranges.length;
+  const totalRaw = combinedV4.length + combinedV6.length;
   if (totalRaw > 0) {
     console.log(
-      `[echelon] threat-feeds: loaded ${totalRaw} datacenter CIDRs → ${dcRangeCount} merged ranges (${dcRangesV4.length} v4, ${dcRangesV6.length} v6)`,
+      `[echelon] threat-feeds: loaded ${totalRaw} datacenter CIDRs (aws=${
+        awsV4Ranges.length + awsV6Ranges.length
+      }, gcp=${
+        gcpV4Ranges.length + gcpV6Ranges.length
+      }) → ${dcRangeCount} merged ranges (${dcRangesV4.length} v4, ${dcRangesV6.length} v6)`,
     );
   }
 }
@@ -426,6 +482,11 @@ export function stopThreatFeeds(): void {
   aiCrawlerRegex = null;
   dcRangesV4 = [];
   dcRangesV6 = [];
+  awsV4Ranges = [];
+  awsV6Ranges = [];
+  gcpV4Ranges = [];
+  gcpV6Ranges = [];
+  dcRangeCount = 0;
 }
 
 /** Current feed stats for admin/debugging. */

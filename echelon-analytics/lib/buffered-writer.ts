@@ -7,6 +7,9 @@ import type { DbAdapter } from "./db/adapter.ts";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2_000;
+// After this many back-to-back flush cycles fail, escalate to CRITICAL
+// so health checks and logs make the degradation obvious.
+const CRITICAL_CYCLE_THRESHOLD = 3;
 
 export class BufferedWriter<T> {
   private buffer: T[] = [];
@@ -14,6 +17,7 @@ export class BufferedWriter<T> {
   private timer: ReturnType<typeof setInterval> | null = null;
   private flushing: Promise<void> | null = null;
   private dropped = 0;
+  private consecutiveFailedCycles = 0;
 
   constructor(
     private readonly insert: (db: DbAdapter, batch: T[]) => Promise<void>,
@@ -24,6 +28,16 @@ export class BufferedWriter<T> {
 
   get size(): number {
     return this.buffer.length;
+  }
+
+  /** Number of back-to-back flush cycles that have fully failed. Zero when healthy. */
+  get failedCycles(): number {
+    return this.consecutiveFailedCycles;
+  }
+
+  /** Records dropped because the buffer was full (per-process total). */
+  get droppedCount(): number {
+    return this.dropped;
   }
 
   push(record: T): void {
@@ -80,6 +94,10 @@ export class BufferedWriter<T> {
     // Snapshot the batch but keep in buffer until insert confirms
     const batch = this.buffer.slice(0, count);
     this.flushing = this.flushWithRetry(db, batch, count)
+      // Prevent unhandled rejections on timer-driven flushes — the error
+      // is already logged inside flushWithRetry. stop() also awaits
+      // flush() but tolerates rejection via the outer drain loop.
+      .catch(() => {})
       .finally(() => {
         this.flushing = null;
       });
@@ -96,6 +114,12 @@ export class BufferedWriter<T> {
         await this.insert(db, batch);
         // Only remove records after successful insert
         this.buffer.splice(0, count);
+        if (this.consecutiveFailedCycles > 0) {
+          console.log(
+            `[echelon] ${this.label} flush recovered after ${this.consecutiveFailedCycles} failed cycles`,
+          );
+          this.consecutiveFailedCycles = 0;
+        }
         return;
       } catch (e) {
         if (attempt < MAX_RETRIES) {
@@ -106,10 +130,17 @@ export class BufferedWriter<T> {
           );
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
         } else {
+          this.consecutiveFailedCycles++;
+          const severity =
+            this.consecutiveFailedCycles >= CRITICAL_CYCLE_THRESHOLD
+              ? "CRITICAL: "
+              : "";
           console.error(
-            `[echelon] ${this.label} flush failed after ${MAX_RETRIES} attempts — ${count} records remain in buffer:`,
+            `[echelon] ${severity}${this.label} flush failed after ${MAX_RETRIES} attempts ` +
+              `(${this.consecutiveFailedCycles} consecutive failed cycles) — ${count} records remain in buffer:`,
             e,
           );
+          throw e;
         }
       }
     }

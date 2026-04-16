@@ -207,14 +207,17 @@ export async function runDailyMaintenance(db: DbAdapter): Promise<void> {
 
 /**
  * Schedule daily maintenance at 03:00 UTC.
- * Checks every hour, runs once per calendar day.
+ * Runs an immediate check on start (in case we're restarting inside the
+ * target hour) and then polls every hour thereafter. The one-per-day guard
+ * (lastDate) ensures we don't re-run if the immediate check and a timer
+ * tick both fall in the target hour.
  */
 export function scheduleDailyMaintenance(db: DbAdapter): void {
   const CHECK_MS = 3_600_000; // 1 hour
   const TARGET_HOUR = 3;
   let lastDate = "";
 
-  setInterval(() => {
+  const tick = () => {
     const now = new Date();
     if (now.getUTCHours() !== TARGET_HOUR) return;
 
@@ -225,7 +228,14 @@ export function scheduleDailyMaintenance(db: DbAdapter): void {
     runDailyMaintenance(db).catch((e) =>
       console.error("[echelon] daily maintenance: unhandled error", e)
     );
-  }, CHECK_MS);
+  };
+
+  // Immediate check — a process restart between 03:00 and 04:00 would
+  // otherwise miss today's target window because setInterval's first
+  // tick is CHECK_MS in the future.
+  tick();
+
+  setInterval(tick, CHECK_MS);
 
   console.log("[echelon] daily maintenance scheduled (runs at ~3 AM UTC)");
 }

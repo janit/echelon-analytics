@@ -429,12 +429,13 @@ export function parseOS(ua: string | undefined): string | undefined {
   const winNT = ua.match(/Windows NT (\d+\.\d+)/);
   if (winNT) {
     const ver = winNT[1];
+    // Windows 10 and Windows 11 both report NT 10.0 in the UA string — the
+    // browser only distinguishes them via Sec-CH-UA-Platform-Version, which
+    // we don't receive in this path. Label accordingly.
     const winMap: Record<string, string> = {
-      "10.0": "Windows 10+",
+      "10.0": "Windows 10/11",
       "6.3": "Windows 8.1",
-      "6.2": "Windows 8",
       "6.1": "Windows 7",
-      "6.0": "Windows Vista",
     };
     return winMap[ver] ?? `Windows NT ${ver}`;
   }

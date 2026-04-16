@@ -162,7 +162,7 @@ const MAX_EXCLUDED_CACHE = 100_000;
 const excludedSet = new Set<string>();
 let excludedRefreshedAt = 0;
 
-async function refreshExcluded(db: DbAdapter): Promise<void> {
+export async function refreshExcluded(db: DbAdapter): Promise<void> {
   if (Date.now() - excludedRefreshedAt < 60_000) return;
   excludedSet.clear();
   const rows = await db.query<{ visitor_id: string }>(
@@ -276,7 +276,6 @@ export async function handleBeacon(
         .map((b) => b.toString(16).padStart(2, "0")).join("");
   } else {
     const ip = getClientIp(req);
-    const ua = req.headers.get("user-agent") ?? "";
     const day = new Date().toISOString().slice(0, 10);
     visitorId = await hashVisitor(ip, ua, siteId, day);
     isReturning = false;
@@ -288,35 +287,27 @@ export async function handleBeacon(
   await refreshConsentCss(db);
 
   // Parse UTM params (base64-encoded from tracker)
+  const decodeB64Param = (key: string): string | null => {
+    const v = url.searchParams.get(key);
+    if (!v) return null;
+    try {
+      return decodeURIComponent(atob(v)).slice(0, 256);
+    } catch {
+      return null;
+    }
+  };
+
+  let utmCampaign = decodeB64Param("uc");
   let utmSource: string | null = null;
   let utmMedium: string | null = null;
-  let utmCampaign: string | null = null;
   let utmContent: string | null = null;
   let utmTerm: string | null = null;
 
-  const ucB64 = url.searchParams.get("uc");
-  if (ucB64) {
-    try {
-      utmCampaign = decodeURIComponent(atob(ucB64)).slice(0, 256);
-    } catch { /* malformed */ }
-  }
   if (utmCampaign && isUtmCampaignActive(siteId, utmCampaign)) {
-    const usB64 = url.searchParams.get("us");
-    const umB64 = url.searchParams.get("um");
-    const uctB64 = url.searchParams.get("uct");
-    const utB64 = url.searchParams.get("ut");
-    try {
-      if (usB64) utmSource = decodeURIComponent(atob(usB64)).slice(0, 256);
-    } catch { /* */ }
-    try {
-      if (umB64) utmMedium = decodeURIComponent(atob(umB64)).slice(0, 256);
-    } catch { /* */ }
-    try {
-      if (uctB64) utmContent = decodeURIComponent(atob(uctB64)).slice(0, 256);
-    } catch { /* */ }
-    try {
-      if (utB64) utmTerm = decodeURIComponent(atob(utB64)).slice(0, 256);
-    } catch { /* */ }
+    utmSource = decodeB64Param("us");
+    utmMedium = decodeB64Param("um");
+    utmContent = decodeB64Param("uct");
+    utmTerm = decodeB64Param("ut");
   } else {
     utmCampaign = null;
   }
@@ -383,9 +374,8 @@ export async function handleBeacon(
     });
 
     const isPwa = url.searchParams.get("pwa") === "1";
-    const rawUa = req.headers.get("user-agent") ?? undefined;
-    const osName = parseOS(rawUa);
-    const browser = parseBrowser(rawUa);
+    const osName = parseOS(ua || undefined);
+    const browser = parseBrowser(ua || undefined);
     const deviceType = validScreen ? classifyDevice(screenWidth) : undefined;
 
     // Feed the bot correlator — ephemeral fingerprint for async clustering

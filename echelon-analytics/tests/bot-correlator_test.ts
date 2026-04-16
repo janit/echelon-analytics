@@ -237,7 +237,7 @@ Deno.test({
       });
       recordPrint(makePrint(`ip_hash_${i}`, vid, {
         fingerprint: {
-          osName: "Windows 10+",
+          osName: "Windows 10/11",
           browserName: "Chrome",
           browserVersion: "131.0.0.0",
           screenWidth: 1920,

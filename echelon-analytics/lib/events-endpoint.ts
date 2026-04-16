@@ -17,7 +17,7 @@ import {
   hashVisitor,
   isKnownBot,
 } from "./bot-score.ts";
-import { isExcluded } from "./beacon.ts";
+import { isExcluded, refreshExcluded } from "./beacon.ts";
 import {
   ALLOWED_SITES,
   BOT_DISCARD_THRESHOLD,
@@ -46,6 +46,37 @@ interface ClientEvent {
 const MAX_EVENTS_PER_REQUEST = 20;
 const MAX_BODY_BYTES = 16_384; // 16 KB
 const MAX_EVENT_DATA_BYTES = 2_048; // 2 KB per event data
+
+class BodyTooLargeError extends Error {}
+
+/**
+ * Stream-read a request body with a hard byte cap. Aborts the reader as
+ * soon as the cap is exceeded so attackers can't force buffering of an
+ * oversized payload by spoofing Content-Length: 0.
+ */
+async function readBodyCapped(req: Request, maxBytes: number): Promise<string> {
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let out = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new BodyTooLargeError();
+      }
+      out += decoder.decode(value, { stream: true });
+    }
+    out += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+  return out;
+}
 
 const ALLOWED_EVENT_TYPES = new Set([
   "bounce",
@@ -134,26 +165,28 @@ export function getEventBufferSize(): number {
 
 export async function handleEvents(
   req: Request,
-  _db: DbAdapter,
+  db: DbAdapter,
 ): Promise<Response> {
   // Drop known bots immediately
   if (isKnownBot(req.headers.get("user-agent") ?? undefined)) {
     return new Response(null, { status: 204 });
   }
 
-  // Reject oversized payloads (check Content-Length before reading body)
+  // Reject oversized payloads up-front on the declared Content-Length.
+  // Attackers can lie with Content-Length: 0 and send a huge body, so we
+  // also stream-cap the read below.
   const contentLength = parseInt(req.headers.get("content-length") ?? "0");
   if (contentLength > MAX_BODY_BYTES) {
     return new Response(null, { status: 413 });
   }
   let rawBody: string;
   try {
-    rawBody = await req.text();
-  } catch {
+    rawBody = await readBodyCapped(req, MAX_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) {
+      return new Response(null, { status: 413 });
+    }
     return new Response(null, { status: 400 });
-  }
-  if (rawBody.length > MAX_BODY_BYTES) {
-    return new Response(null, { status: 413 });
   }
   if (rawBody.length === 0) {
     return new Response(null, { status: 400 });
@@ -226,6 +259,12 @@ export async function handleEvents(
     const day = new Date().toISOString().slice(0, 10);
     visitorId = await hashVisitor(ip, ua, siteId, day);
   }
+
+  // Keep the exclusion cache warm on the event-only path — cookieless
+  // sendBeacon traffic can reach /e without ever hitting /b.gif, and on
+  // cold boot the cache is empty until refreshExcluded runs. 60s TTL
+  // enforced inside refreshExcluded — cheap no-op when still fresh.
+  await refreshExcluded(db);
 
   // Skip excluded visitors
   if (isExcluded(visitorId)) {

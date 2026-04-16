@@ -260,10 +260,10 @@ Deno.test("parseOS — Android", () => {
   );
 });
 
-Deno.test("parseOS — Windows 10+", () => {
+Deno.test("parseOS — Windows 10/11", () => {
   assertEquals(
     parseOS("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"),
-    "Windows 10+",
+    "Windows 10/11",
   );
 });
 

@@ -51,7 +51,7 @@ const NO_EVENTS_PENALTY = 15; // Moderate — won't cross 50 alone
 
 /** A fingerprint captures the browser/device identity — fields a bot farm can't easily vary. */
 interface Fingerprint {
-  osName: string; // e.g. "Linux", "Windows 10+"
+  osName: string; // e.g. "Linux", "Windows 10/11"
   browserName: string; // e.g. "Chrome"
   browserVersion: string; // e.g. "139.0.0.0"
   screenWidth: number; // e.g. 1920
@@ -114,6 +114,10 @@ async function sweep(db: DbAdapter): Promise<void> {
   }
   if (pruneIdx > 0) prints.splice(0, pruneIdx);
 
+  // No-event bounce detection runs independently of live prints — quiet
+  // periods are exactly when hit-and-leave bots need to be caught.
+  await penalizeNoEventBounces(db);
+
   if (prints.length === 0) return;
 
   // Group by (siteId, fingerprint)
@@ -152,15 +156,6 @@ async function sweep(db: DbAdapter): Promise<void> {
 
   if (clusters.length === 0) return;
 
-  // Feed confirmed bot IPs into the fast-path map so future requests
-  // from the same IPs get penalised immediately (without waiting for
-  // the next sweep cycle).
-  for (const cluster of clusters) {
-    for (const ipHash of cluster.ipHashes) {
-      recordConfirmedBotIp(ipHash);
-    }
-  }
-
   // Apply penalties to the DB
   for (const cluster of clusters) {
     const penalty =
@@ -169,7 +164,6 @@ async function sweep(db: DbAdapter): Promise<void> {
         : PENALTY_NORMAL;
 
     const visitorIds = [...cluster.visitorIds];
-    const placeholders = visitorIds.map(() => "?").join(",");
     const detail = JSON.stringify({
       reason: "correlated",
       penalty,
@@ -178,43 +172,78 @@ async function sweep(db: DbAdapter): Promise<void> {
       fingerprint: cluster.fpKeyStr,
     });
 
+    // Chunk visitor_ids: SQLite's SQLITE_MAX_VARIABLE_NUMBER is 32766 on
+    // node:sqlite. The UPDATE uses 4 non-IN params, so stay well under.
+    const UPDATE_CHUNK_SIZE = 500;
+
     // Update both tables atomically so a crash between them can't leave
     // visitor_views and semantic_events with inconsistent bot scores.
-    const totalUpdated = await db.transaction(async (tx) => {
-      const viewResult = await tx.run(
-        `UPDATE visitor_views
-         SET bot_score = MIN(bot_score + ?, 100),
-             bot_score_detail = CASE
-               WHEN bot_score_detail IS NULL THEN ?
-               ELSE json_set(bot_score_detail, '$.correlated', json(?))
-             END
-         WHERE visitor_id IN (${placeholders})
-           AND bot_score BETWEEN 0 AND 49
-           AND (bot_score_detail IS NULL OR bot_score_detail NOT LIKE '%"correlated"%')`,
-        penalty,
-        `{"correlated":${detail}}`,
-        detail,
-        ...visitorIds,
-      );
+    let totalUpdated = 0;
+    try {
+      totalUpdated = await db.transaction(async (tx) => {
+        let changes = 0;
+        for (let i = 0; i < visitorIds.length; i += UPDATE_CHUNK_SIZE) {
+          const chunk = visitorIds.slice(i, i + UPDATE_CHUNK_SIZE);
+          const placeholders = chunk.map(() => "?").join(",");
 
-      const eventResult = await tx.run(
-        `UPDATE semantic_events
-         SET bot_score = MIN(bot_score + ?, 100),
-             bot_score_detail = CASE
-               WHEN bot_score_detail IS NULL THEN ?
-               ELSE json_set(bot_score_detail, '$.correlated', json(?))
-             END
-         WHERE visitor_id IN (${placeholders})
-           AND bot_score BETWEEN 0 AND 49
-           AND (bot_score_detail IS NULL OR bot_score_detail NOT LIKE '%"correlated"%')`,
-        penalty,
-        `{"correlated":${detail}}`,
-        detail,
-        ...visitorIds,
-      );
+          const viewResult = await tx.run(
+            `UPDATE visitor_views
+             SET bot_score = MIN(bot_score + ?, 100),
+                 bot_score_detail = CASE
+                   WHEN bot_score_detail IS NULL THEN ?
+                   ELSE json_set(bot_score_detail, '$.correlated', json(?))
+                 END
+             WHERE site_id = ?
+               AND visitor_id IN (${placeholders})
+               AND bot_score BETWEEN 0 AND 49
+               AND (bot_score_detail IS NULL OR bot_score_detail NOT LIKE '%"correlated"%')`,
+            penalty,
+            `{"correlated":${detail}}`,
+            detail,
+            cluster.siteId,
+            ...chunk,
+          );
 
-      return viewResult.changes + eventResult.changes;
-    });
+          const eventResult = await tx.run(
+            `UPDATE semantic_events
+             SET bot_score = MIN(bot_score + ?, 100),
+                 bot_score_detail = CASE
+                   WHEN bot_score_detail IS NULL THEN ?
+                   ELSE json_set(bot_score_detail, '$.correlated', json(?))
+                 END
+             WHERE site_id = ?
+               AND visitor_id IN (${placeholders})
+               AND bot_score BETWEEN 0 AND 49
+               AND (bot_score_detail IS NULL OR bot_score_detail NOT LIKE '%"correlated"%')`,
+            penalty,
+            `{"correlated":${detail}}`,
+            detail,
+            cluster.siteId,
+            ...chunk,
+          );
+
+          changes += viewResult.changes + eventResult.changes;
+        }
+        return changes;
+      });
+    } catch (e) {
+      console.error(
+        `[echelon] bot-correlator: transaction failed for cluster on ${cluster.siteId}`,
+        e,
+      );
+      // Skip the confirmed-IP map update on failure — keeping in-memory
+      // and DB state consistent is more valuable than penalising the IPs
+      // now. The next sweep will try again.
+      continue;
+    }
+
+    // Only after the DB has been successfully updated do we record the
+    // IPs as confirmed bots in the fast-path map. This keeps in-memory
+    // state and DB rows in sync across restarts.
+    for (const ipHash of cluster.ipHashes) {
+      recordConfirmedBotIp(ipHash);
+    }
+
     if (totalUpdated > 0) {
       console.log(
         `[echelon] bot-correlator: flagged cluster on ${cluster.siteId} ` +
@@ -227,10 +256,6 @@ async function sweep(db: DbAdapter): Promise<void> {
       );
     }
   }
-
-  // ── No-event bounce detection ──────────────────────────────────────────
-  // Penalise visits old enough to have generated events but that have none.
-  await penalizeNoEventBounces(db);
 }
 
 /**
